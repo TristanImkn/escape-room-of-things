@@ -12,6 +12,11 @@ RIOTBASE ?= ../RIOT
 # development process:
 DEVELHELP ?= 1
 
+# LED strip
+USEMODULE += apa102
+USEMODULE += color
+USEMODULE += xtimer
+
 # For the coap_client
 USEMODULE += od
 
