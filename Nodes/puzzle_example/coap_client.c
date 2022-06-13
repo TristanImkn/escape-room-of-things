@@ -102,12 +102,20 @@ static size_t _send(uint8_t *buf, size_t len, char *addr_str, char *port_str)
 {
     size_t bytes_sent;
     sock_udp_ep_t remote;
+    gcoap_socket_type_t type;
+
 
     if (!_parse_endpoint(&remote, addr_str, port_str)) {
         return 0;
     }
-
-    bytes_sent = gcoap_req_send(buf, len, &remote, _resp_handler, NULL);
+    if (remote.port == CONFIG_GCOAP_PORT){
+        type = GCOAP_SOCKET_TYPE_UDP;
+        puts("Using udp");
+    } else {
+        puts("Using dtls");
+        type = GCOAP_SOCKET_TYPE_DTLS;
+    }
+    bytes_sent = gcoap_req_send_tl(buf, len, &remote, _resp_handler, NULL, type);
     if (bytes_sent > 0) {
         req_count++;
     }

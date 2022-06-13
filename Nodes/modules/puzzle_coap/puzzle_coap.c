@@ -19,6 +19,9 @@
 
 #include "puzzle_coap.h"
 #include "cbor.h"
+#include "net/credman.h"
+
+#define DTLS_TAG 1
 
 static const puzzle_t *_puzzle_info;
 
@@ -27,22 +30,48 @@ static ssize_t _puzzle_ready_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len, 
 static ssize_t _puzzle_maintainance_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len, void *ctx);
 static ssize_t _puzzle_encoder(const coap_resource_t *resource, char *buf, size_t maxlen, coap_link_encoder_ctx_t *context);
 
+static ssize_t _puzzle_serial_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len, void *ctx);
+
 
 /* CoAP resources. Must be sorted by path (ASCII order). */
 static coap_resource_t _resources[] = {
     { "/node/info", COAP_GET, _puzzle_info_handler, NULL },
     { "/node/maintainance", COAP_PUT, _puzzle_maintainance_handler, NULL },
     { "/node/ready", COAP_PUT, _puzzle_ready_handler, NULL },
+    /*{ "/node/serial", COAP_GET, _puzzle_serial_handler, NULL },*/
 };
 
+static coap_resource_t _serials[] = {
+    { "/node/serial", COAP_GET, _puzzle_serial_handler, NULL },
+};
 
 static gcoap_listener_t _default_listener = {
     _resources,
     ARRAY_SIZE(_resources),
-    GCOAP_SOCKET_TYPE_UDP,
+    GCOAP_SOCKET_TYPE_DTLS,
     _puzzle_encoder,
     NULL,
     NULL
+};
+
+static gcoap_listener_t _unsecure_listener = {
+    _serials,
+    ARRAY_SIZE(_serials),
+    GCOAP_SOCKET_TYPE_UDP,
+    NULL,
+    NULL,
+    NULL
+};
+
+static const credman_credential_t credential = {
+    .type = CREDMAN_TYPE_PSK,
+    .tag = DTLS_TAG,
+    .params = {
+        .psk = {
+            .key = { .s = psk_key, .len = sizeof(psk_key) - 1, },
+            .id = { .s = psk_id, .len = sizeof(psk_id) - 1, },
+        }
+    },
 };
 
 static int _make_sock_ep(sock_udp_ep_t *ep, uri_parser_result_t *uri)
@@ -132,13 +161,17 @@ static ssize_t _build_cbor_coap_packet(coap_pkt_t *pdu, uint8_t *buf, size_t len
 
 void puzzle_init(const puzzle_t *puzzle)
 {
+    int res = 0;
     assert(puzzle);
     assert(puzzle->name);
     assert(puzzle->resource_dir_uri);
+    assert(puzzle->serial);
     assert(puzzle->get_solved_handler);
     assert(puzzle->get_ready_handler);
     assert(puzzle->set_ready_handler);
+
     _puzzle_info = puzzle;
+    gcoap_register_listener(&_unsecure_listener);
 
     sock_udp_ep_t remote;
     uri_parser_result_t uri_result;
@@ -146,9 +179,24 @@ void puzzle_init(const puzzle_t *puzzle)
     assert(uri_parser_process_string(&uri_result, puzzle->resource_dir_uri) == 0);
     assert(_make_sock_ep(&remote, &uri_result) == 0);
 
+    res = credman_add(&credential);
+    if (res < 0 && res != CREDMAN_EXIST) {
+        /* ignore duplicate credentials */
+        printf("gcoap: cannot add credential to system: %d\n", res);
+        return;
+    }
+    sock_dtls_t *gcoap_sock_dtls = gcoap_get_sock_dtls();
+    res = sock_dtls_add_credential(gcoap_sock_dtls, DTLS_TAG);
+    if (res < 0) {
+        printf("gcoap: cannot add credential to DTLS sock: %d\n", res);
+    }
+
     gcoap_register_listener(&_default_listener);
 
     puts("Registering with RD now, this may take a short while...");
+    #ifdef CONFIG_CORD_EP
+    printf("Using serial: %s\n", CONFIG_CORD_EP);
+    #endif
     if (cord_ep_register(&remote, NULL) != CORD_EP_OK) {
         puts("error: registration failed");
         return;
@@ -277,4 +325,39 @@ static ssize_t _puzzle_encoder(const coap_resource_t *resource, char *buf,
     }
 
     return res;
+}
+
+
+/*
+ * Server callback for /node/serial. Accepts only GET.
+ *
+ * GET: Returns the puzzle serial
+ */
+static ssize_t _puzzle_serial_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len, void *ctx)
+{
+    (void)ctx;
+    /* since the init functions asserts all other members, 
+     * its safe to just assert the base pointer */
+    assert(_puzzle_info);
+
+    /* initialize a new coap response */
+    gcoap_resp_init(pdu, buf, len, COAP_CODE_CONTENT);
+
+    coap_opt_add_format(pdu, COAP_FORMAT_TEXT);
+
+    /* finish the options sections */
+    /* it is important to keep track of the amount of used bytes (resp_len) */
+    size_t resp_len = coap_opt_finish(pdu, COAP_OPT_FINISH_PAYLOAD);
+
+
+    if (pdu->payload_len >= strlen(_puzzle_info->serial)){
+        memcpy(pdu->payload, _puzzle_info->serial, strlen(_puzzle_info->serial));
+        return resp_len + strlen(_puzzle_info->serial);
+    } else {
+        /* in this case we use a simple convenience function to create the
+         * response, it only allows to set a payload and a response code. */
+        puts("puzzle_coap: msg buffer too small for given puzzle cbor object");
+        return gcoap_response(pdu, buf, len, COAP_CODE_INTERNAL_SERVER_ERROR);
+    }
+    return resp_len;
 }
