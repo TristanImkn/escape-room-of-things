@@ -53,10 +53,10 @@ static bool _is_ready = true;
 
 void *lego_handler(void *arg) {
     (void) arg;
-    gpio_t input1 = GPIO_PIN(0, 1);
-    gpio_t input2 = GPIO_PIN(0, 2);
-    gpio_t input3 = GPIO_PIN(4, 4);
-    gpio_t led0 = GPIO_PIN(3, 6);
+    gpio_t input1 = GPIO_PIN(1, 10);
+    gpio_t input2 = GPIO_PIN(1, 11);
+    gpio_t input3 = GPIO_PIN(1, 12);
+    gpio_t led0 = GPIO_PIN(0, 13);
     gpio_mode_t input_mode = GPIO_IN_PU;
     gpio_mode_t led0_mode = GPIO_OUT;
 

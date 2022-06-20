@@ -4,6 +4,6 @@ This program connects the node to the server via coap. Also 3 different magnets 
 
 Connection
 White (single) - GND
-Blue - D7
-Green - D6
-White - D4
+Blue - 1.10
+Green - 1.11
+White - 1.12
