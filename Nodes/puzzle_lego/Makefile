@@ -1,5 +1,5 @@
 # name of the application
-APPLICATION = example
+APPLICATION = Lego_Puzzle
 
 # If no BOARD is found in the environment, use this default:
 BOARD ?= pba-d-01-kw2x

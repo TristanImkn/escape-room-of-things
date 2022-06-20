@@ -43,8 +43,9 @@ static const puzzle_t puzzle = {
     .get_solved_handler = _solved,
     .get_ready_handler = _ready,
     .set_ready_handler = _set_ready,
-    .name = "Lego puzzle",
-    .resource_dir_uri = "coap://[fd00:dead:beef::1]:5555",
+    .name = RIOT_APPLICATION,
+    .resource_dir_uri = "coap://[fd00:dead:beef::1]:5683",
+    .serial = SERIAL_UUID, /* is provided via the build system! */
 };
 
 static bool _is_solved = false;
@@ -52,10 +53,10 @@ static bool _is_ready = true;
 
 void *lego_handler(void *arg) {
     (void) arg;
-    gpio_t input1 = GPIO_PIN(PORT_A, 1);
-    gpio_t input2 = GPIO_PIN(PORT_A, 2);
-    gpio_t input3 = GPIO_PIN(PORT_E, 4);
-    gpio_t led0 = GPIO_PIN(PORT_D, 6);
+    gpio_t input1 = GPIO_PIN(0, 1);
+    gpio_t input2 = GPIO_PIN(0, 2);
+    gpio_t input3 = GPIO_PIN(4, 4);
+    gpio_t led0 = GPIO_PIN(3, 6);
     gpio_mode_t input_mode = GPIO_IN_PU;
     gpio_mode_t led0_mode = GPIO_OUT;
 
@@ -70,11 +71,11 @@ void *lego_handler(void *arg) {
         if (gpio_read(input1) == 0 && gpio_read(input2) == 0 && gpio_read(input3) == 0){
             gpio_clear(led0);
             _is_solved = true;
-            puts("All magnets detected");}
+            /*puts("All magnets detected");*/}
         else{
             _is_solved = false;
             gpio_set(led0);
-            puts("Not all magnets detected");
+            /*puts("Not all magnets detected");*/
         }
 
         ztimer_sleep(ZTIMER_MSEC, 500);
