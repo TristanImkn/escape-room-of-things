@@ -2,7 +2,7 @@
 APPLICATION = LEDPuzzle
 
 # If no BOARD is found in the environment, use this default:
-BOARD ?= nRF52840DK
+BOARD ?= nRF52840dk
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= ../RIOT
@@ -19,6 +19,10 @@ USEMODULE += xtimer
 # Button
 USEMODULE += periph_gpio
 USEMODULE += periph_gpio_irq
+
+# event handling
+USEMODULE += event
+USEMODULE += event_periodic
 
 
 include $(RIOTBASE)/Makefile.include
